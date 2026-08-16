@@ -20,6 +20,8 @@
 #   -t TEMP    temperature (デフォルト: 0.7)
 #   -T BOOL    思考(thinking)モードの有効/無効。true か false (デフォルト: false)
 #              思考過程も含めたい場合は -T true で有効化する
+#   -v         詳細情報を表示 (時刻・トークン使用量・警告など)。
+#              指定しない場合は回答本文のみを出力する (エラーは常に表示)
 #   -h         このヘルプを表示
 #
 # 事前準備:
@@ -37,13 +39,14 @@ SYSTEM=""
 DOCS_DIR="./data"
 TEMP="0.7"
 THINK="false"
+VERBOSE="false"
 
 usage() {
-    sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'
     exit 0
 }
 
-while getopts "m:H:s:d:t:T:h" opt; do
+while getopts "m:H:s:d:t:T:vh" opt; do
     case "$opt" in
         m) MODEL="$OPTARG" ;;
         H) OLLAMA_HOST="$OPTARG" ;;
@@ -57,6 +60,7 @@ while getopts "m:H:s:d:t:T:h" opt; do
             fi
             THINK="$OPTARG"
             ;;
+        v) VERBOSE="true" ;;
         h) usage ;;
         *) usage ;;
     esac
@@ -92,7 +96,7 @@ if [[ -n "$DOCS_DIR" ]]; then
     done < <(find "$DOCS_DIR" -type f \( -name "*.md" -o -name "*.txt" \) | sort)
 
     if [[ -z "$CONTEXT_DOC" ]]; then
-        echo "警告: ${DOCS_DIR} 内に .md / .txt ファイルが見つかりませんでした。" >&2
+        [[ "$VERBOSE" == "true" ]] && echo "警告: ${DOCS_DIR} 内に .md / .txt ファイルが見つかりませんでした。" >&2
     else
         NOTE="以下はユーザーが指定した参考資料です。回答にはこの資料の内容を優先して用い、資料に書かれていないことは推測で断定せず、その旨を伝えてください。"
         SYSTEM="${SYSTEM:+${SYSTEM}$'\n\n'}${NOTE}${CONTEXT_DOC}"
@@ -115,7 +119,7 @@ for _w in $PROMPT; do
             echo "エラー: PDF を読むには pdftotext が必要です。'brew install poppler' でインストールしてください。" >&2
             exit 1
         fi
-        echo "PDFを読み込み中: ${_fp##*/} ..." >&2
+        [[ "$VERBOSE" == "true" ]] && echo "PDFを読み込み中: ${_fp##*/} ..." >&2
         _fc=$(pdftotext "$_fp" -)
     else
         _fc=$(cat "$_fp")
@@ -180,6 +184,12 @@ RESPONSE_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 
 RESPONSE_LINE=$(cat "$RESPONSE_FILE")
 
+if ! echo "$RESPONSE_LINE" | jq -e . >/dev/null 2>&1; then
+    echo "エラー: Ollama から不正な応答を受け取りました (通信エラーの可能性があります)。" >&2
+    echo "$RESPONSE_LINE" >&2
+    exit 1
+fi
+
 ERROR_MSG=""
 PROMPT_TOKENS=""
 OUTPUT_TOKENS=""
@@ -197,14 +207,16 @@ if [[ -n "$ERROR_MSG" ]]; then
     exit 1
 fi
 
-echo "" >&2
-echo "---- 時刻 ----" >&2
-echo "入力時刻: ${REQUEST_TIME}" >&2
-echo "出力時刻: ${RESPONSE_TIME}" >&2
-
-if [[ -n "$PROMPT_TOKENS" ]]; then
+if [[ "$VERBOSE" == "true" ]]; then
     echo "" >&2
-    echo "---- トークン使用量 (実測値) ----" >&2
-    echo "入力 (資料 + システムプロンプト + 質問): ${PROMPT_TOKENS} トークン" >&2
-    echo "出力 (応答)                          : ${OUTPUT_TOKENS:-不明} トークン" >&2
+    echo "---- 時刻 ----" >&2
+    echo "入力時刻: ${REQUEST_TIME}" >&2
+    echo "出力時刻: ${RESPONSE_TIME}" >&2
+
+    if [[ -n "$PROMPT_TOKENS" ]]; then
+        echo "" >&2
+        echo "---- トークン使用量 (実測値) ----" >&2
+        echo "入力 (資料 + システムプロンプト + 質問): ${PROMPT_TOKENS} トークン" >&2
+        echo "出力 (応答)                          : ${OUTPUT_TOKENS:-不明} トークン" >&2
+    fi
 fi

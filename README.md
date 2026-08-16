@@ -4,7 +4,8 @@
 Ollama model through the `/api/chat` endpoint.
 
 It is intended for quick terminal use: pass a prompt, optionally attach local
-documents, and get a single response with timing and token usage.
+documents, and get a single response. By default only the answer itself is
+printed; timestamps and token usage are available on request.
 
 ## Features
 
@@ -16,7 +17,10 @@ documents, and get a single response with timing and token usage.
 - Expand `@file` references inside the prompt
 - Read PDF files via `pdftotext` when available
 - Toggle thinking mode with `-T true|false`
-- Show request/response timestamps and measured token usage
+- Show a "考え中... (Ns経過)" spinner while waiting, so a slow/thinking model
+  doesn't look stalled
+- Prints only the answer by default; show request/response timestamps and
+  measured token usage with `-v`
 
 ## Requirements
 
@@ -91,6 +95,12 @@ Enable thinking mode:
 ./ollama-ask.sh -T true "考え方も含めて説明して"
 ```
 
+Show timestamps and token usage:
+
+```sh
+./ollama-ask.sh -v "日本語でOllamaの概要を説明して"
+```
+
 ## Reference Documents
 
 By default, the script reads `./data`. It recursively loads
@@ -133,6 +143,8 @@ File paths without spaces are recommended for `@file` references.
 -d DIR     Reference document directory. Reads *.md and *.txt recursively.
 -t TEMP    Temperature. Default: 0.7
 -T BOOL    Thinking mode. Use true or false. Default: false
+-v         Verbose output: show timestamps, token usage, and warnings.
+           Without it, only the answer is printed. Errors are always shown.
 -h         Show help
 ```
 
