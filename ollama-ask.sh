@@ -90,7 +90,9 @@ if [[ -n "$DOCS_DIR" ]]; then
     fi
 
     CONTEXT_DOC=""
+    DOC_FILES=()
     while IFS= read -r f; do
+        DOC_FILES+=("$f")
         CONTEXT_DOC+=$'\n\n---- ファイル: '"$f"$' ----\n'
         CONTEXT_DOC+="$(cat "$f")"
     done < <(find "$DOCS_DIR" -type f \( -name "*.md" -o -name "*.txt" -o -name "*.csv" \) | sort)
@@ -98,6 +100,10 @@ if [[ -n "$DOCS_DIR" ]]; then
     if [[ -z "$CONTEXT_DOC" ]]; then
         [[ "$VERBOSE" == "true" ]] && echo "警告: ${DOCS_DIR} 内に .md / .txt / .csv ファイルが見つかりませんでした。" >&2
     else
+        if [[ "$VERBOSE" == "true" ]]; then
+            echo "---- 読み込んだ資料ファイル (${#DOC_FILES[@]}件) ----" >&2
+            printf '  - %s\n' "${DOC_FILES[@]}" >&2
+        fi
         NOTE="以下はユーザーが指定した参考資料です。回答にはこの資料の内容を優先して用い、資料に書かれていないことは推測で断定せず、その旨を伝えてください。"
         SYSTEM="${SYSTEM:+${SYSTEM}$'\n\n'}${NOTE}${CONTEXT_DOC}"
     fi

@@ -19,8 +19,9 @@ printed; timestamps and token usage are available on request.
 - Toggle thinking mode with `-T true|false`
 - Show a "考え中... (Ns経過)" spinner while waiting, so a slow/thinking model
   doesn't look stalled
-- Prints only the answer by default; show request/response timestamps and
-  measured token usage with `-v`
+- Prints only the answer by default; show request/response timestamps,
+  measured token usage, and the list of reference files loaded via `-d` with
+  `-v`
 
 ## Requirements
 
@@ -116,6 +117,15 @@ Use another directory:
 The loaded reference documents are treated as higher-priority context. If the
 answer is not present in the documents, the model is instructed not to state
 guesses as facts.
+
+With `-v`, the list of loaded files is printed before the answer:
+
+```text
+---- 読み込んだ資料ファイル (3件) ----
+  - ./docs/a.md
+  - ./docs/c.csv
+  - ./docs/sub/b.txt
+```
 
 ## `@file` References
 
