@@ -105,7 +105,8 @@ Show timestamps and token usage:
 ## Reference Documents
 
 By default, the script reads `./data`. It recursively loads
-`.md`, `.txt`, and `.csv` files from that directory and appends them to the
+`.md`, `.txt`, `.csv`, `.tsv`, `.html`, `.htm`, `.json`, `.yaml`, `.yml`,
+`.log`, `.rst`, and `.org` files from that directory and appends them to the
 system prompt as reference material.
 
 Use another directory:
@@ -150,7 +151,8 @@ File paths without spaces are recommended for `@file` references.
 -m MODEL   Model name. Default: gemma4:latest
 -H HOST    Ollama base URL. Default: http://localhost:11434
 -s SYSTEM  System prompt
--d DIR     Reference document directory. Reads *.md, *.txt, and *.csv recursively.
+-d DIR     Reference document directory. Reads *.md, *.txt, *.csv, *.tsv, *.html,
+           *.htm, *.json, *.yaml, *.yml, *.log, *.rst, and *.org recursively.
 -t TEMP    Temperature. Default: 0.7
 -T BOOL    Thinking mode. Use true or false. Default: false
 -v         Verbose output: show timestamps, token usage, and warnings.

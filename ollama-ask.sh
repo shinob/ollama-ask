@@ -15,7 +15,8 @@
 #   -m MODEL   使用するモデル名 (デフォルト: gemma4:latest)
 #   -H HOST    Ollama のベースURL (デフォルト: http://localhost:11434)
 #   -s SYSTEM  システムプロンプト (省略可)
-#   -d DIR     参考資料フォルダのパス。配下の *.md / *.txt / *.csv を再帰的に読み込み、
+#   -d DIR     参考資料フォルダのパス。配下の *.md / *.txt / *.csv / *.tsv / *.html / *.htm /
+#              *.json / *.yaml / *.yml / *.log / *.rst / *.org を再帰的に読み込み、
 #              システムプロンプトに参考資料として付与する (省略可)
 #   -t TEMP    temperature (デフォルト: 0.7)
 #   -T BOOL    思考(thinking)モードの有効/無効。true か false (デフォルト: false)
@@ -95,10 +96,12 @@ if [[ -n "$DOCS_DIR" ]]; then
         DOC_FILES+=("$f")
         CONTEXT_DOC+=$'\n\n---- ファイル: '"$f"$' ----\n'
         CONTEXT_DOC+="$(cat "$f")"
-    done < <(find "$DOCS_DIR" -type f \( -name "*.md" -o -name "*.txt" -o -name "*.csv" \) | sort)
+    done < <(find "$DOCS_DIR" -type f \( -name "*.md" -o -name "*.txt" -o -name "*.csv" -o -name "*.tsv" \
+        -o -name "*.html" -o -name "*.htm" -o -name "*.json" -o -name "*.yaml" -o -name "*.yml" \
+        -o -name "*.log" -o -name "*.rst" -o -name "*.org" \) | sort)
 
     if [[ -z "$CONTEXT_DOC" ]]; then
-        [[ "$VERBOSE" == "true" ]] && echo "警告: ${DOCS_DIR} 内に .md / .txt / .csv ファイルが見つかりませんでした。" >&2
+        [[ "$VERBOSE" == "true" ]] && echo "警告: ${DOCS_DIR} 内に対応する参考資料ファイルが見つかりませんでした。" >&2
     else
         if [[ "$VERBOSE" == "true" ]]; then
             echo "---- 読み込んだ資料ファイル (${#DOC_FILES[@]}件) ----" >&2
