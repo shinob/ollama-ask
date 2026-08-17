@@ -15,7 +15,7 @@
 #   -m MODEL   使用するモデル名 (デフォルト: gemma4:latest)
 #   -H HOST    Ollama のベースURL (デフォルト: http://localhost:11434)
 #   -s SYSTEM  システムプロンプト (省略可)
-#   -d DIR     参考資料フォルダのパス。配下の *.md / *.txt を再帰的に読み込み、
+#   -d DIR     参考資料フォルダのパス。配下の *.md / *.txt / *.csv を再帰的に読み込み、
 #              システムプロンプトに参考資料として付与する (省略可)
 #   -t TEMP    temperature (デフォルト: 0.7)
 #   -T BOOL    思考(thinking)モードの有効/無効。true か false (デフォルト: false)
@@ -93,10 +93,10 @@ if [[ -n "$DOCS_DIR" ]]; then
     while IFS= read -r f; do
         CONTEXT_DOC+=$'\n\n---- ファイル: '"$f"$' ----\n'
         CONTEXT_DOC+="$(cat "$f")"
-    done < <(find "$DOCS_DIR" -type f \( -name "*.md" -o -name "*.txt" \) | sort)
+    done < <(find "$DOCS_DIR" -type f \( -name "*.md" -o -name "*.txt" -o -name "*.csv" \) | sort)
 
     if [[ -z "$CONTEXT_DOC" ]]; then
-        [[ "$VERBOSE" == "true" ]] && echo "警告: ${DOCS_DIR} 内に .md / .txt ファイルが見つかりませんでした。" >&2
+        [[ "$VERBOSE" == "true" ]] && echo "警告: ${DOCS_DIR} 内に .md / .txt / .csv ファイルが見つかりませんでした。" >&2
     else
         NOTE="以下はユーザーが指定した参考資料です。回答にはこの資料の内容を優先して用い、資料に書かれていないことは推測で断定せず、その旨を伝えてください。"
         SYSTEM="${SYSTEM:+${SYSTEM}$'\n\n'}${NOTE}${CONTEXT_DOC}"
@@ -128,18 +128,30 @@ for _w in $PROMPT; do
     PROMPT="${PROMPT//$_w/$'\n\n---- ファイル: '"$_fp"$' ----\n'"$_fc"$'\n---- ファイル終端 ----\n'}"
 done
 
-MESSAGES="[]"
-if [[ -n "$SYSTEM" ]]; then
-    MESSAGES=$(jq -n --arg s "$SYSTEM" '[{role: "system", content: $s}]')
-fi
-MESSAGES=$(jq -n --argjson base "$MESSAGES" --arg p "$PROMPT" '$base + [{role: "user", content: $p}]')
+JQ_TMP_DIR=$(mktemp -d)
+RESPONSE_FILE=$(mktemp)
+trap 'rm -rf "$JQ_TMP_DIR"; rm -f "$RESPONSE_FILE"; printf "\033[?25h" >&2' EXIT
 
-REQUEST_BODY=$(jq -n \
+# SYSTEM/PROMPT はフォルダ資料や @ファイル展開で巨大になりうるため、
+# jq の引数(--arg)ではなく --rawfile でファイル経由で渡し、ARG_MAX 超過を回避する
+MESSAGES_FILE="${JQ_TMP_DIR}/messages.json"
+echo "[]" > "$MESSAGES_FILE"
+if [[ -n "$SYSTEM" ]]; then
+    printf '%s' "$SYSTEM" > "${JQ_TMP_DIR}/system.txt"
+    jq -n --rawfile s "${JQ_TMP_DIR}/system.txt" '[{role: "system", content: $s}]' > "$MESSAGES_FILE"
+fi
+printf '%s' "$PROMPT" > "${JQ_TMP_DIR}/prompt.txt"
+jq -n --slurpfile base "$MESSAGES_FILE" --rawfile p "${JQ_TMP_DIR}/prompt.txt" \
+    '$base[0] + [{role: "user", content: $p}]' > "${JQ_TMP_DIR}/messages_new.json"
+mv "${JQ_TMP_DIR}/messages_new.json" "$MESSAGES_FILE"
+
+REQUEST_BODY_FILE="${JQ_TMP_DIR}/request_body.json"
+jq -n \
     --arg model "$MODEL" \
-    --argjson messages "$MESSAGES" \
+    --slurpfile messages "$MESSAGES_FILE" \
     --argjson temp "$TEMP" \
     --argjson think "$THINK" \
-    '{model: $model, messages: $messages, stream: false, think: $think, options: {temperature: $temp}}')
+    '{model: $model, messages: $messages[0], stream: false, think: $think, options: {temperature: $temp}}' > "$REQUEST_BODY_FILE"
 
 show_model_not_found_hint() {
     local err="$1"
@@ -162,10 +174,7 @@ show_model_not_found_hint() {
 REQUEST_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 REQUEST_START=$(date '+%s')
 
-RESPONSE_FILE=$(mktemp)
-trap 'rm -f "$RESPONSE_FILE"; printf "\033[?25h" >&2' EXIT
-
-curl -s "${OLLAMA_HOST}/api/chat" -d "$REQUEST_BODY" > "$RESPONSE_FILE" 2>&1 &
+curl -s "${OLLAMA_HOST}/api/chat" -d @"$REQUEST_BODY_FILE" > "$RESPONSE_FILE" 2>&1 &
 CURL_PID=$!
 
 SPINNER='|/-\'
